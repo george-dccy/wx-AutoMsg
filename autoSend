@@ -1,0 +1,206 @@
+Import "FileEx.lua"
+Dim scd,scnx,scny,intX,intY,minute,hour,delay_time,dayofmonth
+Dim mes,period_h,period_m,name,pre_m,pre_h
+Dim file_r,file_c,read_r,clip_r,file_ln,line_t,line_b,num_b1,num_b2,num_n
+Dim msg_sent,minute_use,solid_msgclip
+scnx = GetScreenX()
+scny = GetScreenY()
+file_r = "/sdcard/wx-automsg.txt"
+If FileEx.IsFileExist(file_r) Then 
+	File.Write(file_r,"")
+	Else 
+	FileEx.CreateFile file_r
+End If
+TracePrint scnx, scny
+KeepScreen True
+//读取用户设置
+/*
+mes = ReadUIConfig("msgbox")
+period_h = ReadUIConfig("hourbox")
+period_m = ReadUIConfig("minutebox")
+name = ReadUIConfig("contactbox")
+*/
+mes = "光大银行平安"
+period_h = 8
+period_m = 18
+//name = "宝宝"
+name = "徐州人行金融科技"
+delay_time = 1000
+TracePrint "发送内容：" & mes & "发送对象：" & name & "间隔小时：" & period_h&"小时内分钟："&period_m
+TracePrint period_h,period_m
+Do
+scd = DateTime.Second()
+minute = DateTime.Minute()
+hour = DateTime.Hour()
+dayofmonth = DateTime.Day()
+If (dayofmonth = 2 and hour > 14) or (dayofmonth = 3 and hour < 12) Then 
+	period_h = 1
+	Else 
+	period_h = 8
+End If
+TracePrint period_h&"小时一报"
+File.Write file_r, ""
+sys.SetClipText ""
+If hour = 23 Then 
+	hour = -1
+End If
+mes = "光大银行"&hour+1&"点平安"
+TracePrint "当前时刻：" & hour & "点" & minute & "分" & scd & "秒，循环间隔："&delay_time/1000&"秒"
+If period_m = 0 Then 
+	If hour Mod period_h <> 0 Then
+		TracePrint "不到"&period_h&"小时"
+		//Delay 60*1000
+		ElseIf minute <> 0 Then 
+			TracePrint "不到"&period_m&"分钟"
+			//Delay 60*1000
+		//scd = datetime.second()
+		Else 
+		TracePrint "已到"&period_h&"时"&period_m&"分，发送"
+		sendMsg()
+		delay_time = (30 + Rnd() * 5) * 1000
+	End If
+ElseIf period_h = 0 Then
+	delay_time = 1000
+	If (minute mod period_m = 0) and (minute <> pre_m) Then 
+		pre_m = minute
+		TracePrint "已到"&period_h&"时"&period_m&"分，发送"
+		sendMsg() 
+			//Delay 60*1000
+		//scd = datetime.second()
+		Else 
+		TracePrint "不到"&period_m&"分钟，上次发送为："&pre_m&"分"
+	End If
+Else 
+	If ((hour+1) Mod period_h = 0) and (hour <> pre_h) and (minute = period_m) Then
+		pre_h = hour
+		TracePrint "已到"&period_h&"小时"&period_m&"分，开始发送"
+		sendMsg() 
+		delay_time = (30 + Rnd() * 5) * 1000
+		ElseIf minute <> 0  and hour = pre_h Then 
+			TracePrint "不到"&period_m&"分"
+			//Delay 60*1000
+		//scd = datetime.second()
+		Else 
+		TracePrint "不到"&period_h&"小时，上次发送为："&pre_h&"时"
+		//Delay 60*1000
+	End If
+End If
+Delay delay_time
+Loop While 1
+Function sendMsg()
+	//回到主页
+	Delay 5000
+	Swipe 300,1700,300,200,100
+ Delay 400
+ Swipe 300,1500,300,1000,100
+ Delay 1000
+	KeyPress "Home"
+	//运行微信
+	RunApp "com.tencent.mm"
+	TracePrint "启动微信，等待6秒"
+	//等待6秒，程序启动
+	Delay 6000
+	KeyPress "Back"
+ 	TracePrint "按下返回键"
+ 	Delay 1000
+ 	KeyPress "Back"
+ 	TracePrint "按下返回键"
+ 	Delay 1000
+ 	//再次回到主页
+ 	KeyPress "Home"
+ 	Delay 1000
+ 	RunApp "com.tencent.mm"
+	//等待6秒，程序启动
+	Delay 6000
+ 	//点击通讯录
+ 	Tap (scnx/2+scnx/4)/2,scny-20
+ 	Delay 2000
+ 	//搜索用户
+ 	Tap (scnx-scnx/4),136
+ 	Delay 2000
+ 	//再次点击输入框
+ 	//Tap 283,152
+ 	Delay 1000
+ 	//输入用户名
+ 	InputText name
+ 	Delay 2000
+ 	//点击搜索结果的第一条
+ 	Tap scnx/2,scny/4
+ 	Delay 2000
+ 	clipMsg()
+	solid_clip()
+	Do Until solid_msgclip > 0
+		TracePrint "上一条信息有错，稍等"
+		Delay 2000
+		clipMsg()
+		solid_clip()
+	Loop
+	Delay 400
+	File.Write file_r, clip_r
+	Delay 600
+	file_ln = File.LinesNumber(file_r)
+	line_b = trim(file.ReadLine(file_r, file_ln))
+	num_b1 = CInt(Left(line_b, 1))
+	num_b2 = CInt(Left(line_b, 2))
+	If num_b2 > num_b1 Then 
+		num_n = num_b2 + 1
+		Else 
+		num_n = num_b1 + 1
+	End If
+	Do While InStr(1, line_b, num_n, True) > 0
+		TracePrint InStr(1, line_b, num_n, True)
+		num_n = num_n + 1
+		TracePrint num_n
+	Loop
+	//TracePrint line_b,Left(line_b, 2)
+	//num_n = num_b + 1
+	mes = num_n & "光大银行平安"
+	File.Append file_r, "\n", mes
+	Delay 400
+	mes = File.Read(file_r)
+		//Tap 162,1822
+		//Delay 1000
+		//Tap 150,300
+		//Delay 1000
+		//点击文字框
+		/*
+		FindColor 0,1806,256,1919,"D8D8D8",8,0.9,intX,intY
+		TracePrint intX,intY
+		If intX>-1 And intY>-1 Then 
+ 			Tap intX+50,intY-10
+		End If
+		*/
+		Delay 500
+		Tap scnx/4,scny-100
+ 		Delay 500
+		InputText mes
+		Delay 1000
+		//Tap 800,1800
+		//Delay 3000
+		//发送
+		Tap scnx-100, scny-100
+ 	Delay 1000
+ 	KeyPress "Back"
+ 	TracePrint "按下返回键"
+ 	Delay 1000
+ 	KeyPress "Back"
+ 	TracePrint "按下返回键"
+ 	Delay 1000
+ 	KeyPress "Back"
+ 	TracePrint "按下返回键"
+ End Function
+ Function clipMsg()
+ 	//找到上一条信息,并复制
+ 	FindColor 0,400,275,1758, "FAFAFA", 8, 0.95, intX, intY
+ 	TracePrint intX,intY
+	If intX>-1 And intY>-1 Then 
+ 		Touch intX,intY-10,1000
+	End If
+	//点击复制
+	Tap 333, 628
+ Delay 500
+	clip_r = Sys.GetClipText()
+ End Function
+ Function solid_clip()
+ 	solid_msgclip = UTF8.InStr(1, UTF8.Left(trim(clip_r),10), "日"&(hour+1) & "点", true) or UTF8.InStr(1, UTF8.Left(trim(clip_r),10), "号"&(hour+1) & "点", true) or UTF8.InStr(1, UTF8.Left(trim(clip_r),10), "日"&(hour+1) & "时", true) or UTF8.InStr(1, UTF8.Left(trim(clip_r),10), "号"&(hour+1) & "时", true)
+ End Function
